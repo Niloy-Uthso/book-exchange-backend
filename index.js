@@ -32,6 +32,8 @@ async function run() {
 
     const database = client.db("bookExchange");  
    const  allBooks = database.collection("allbooks")
+const conversations = database.collection("conversations");
+const messages = database.collection("messages");
 
    app.post("/allbooks", async (req, res) => {
   const book = req.body;
@@ -54,7 +56,7 @@ catch (error) {
 
 })
 
-const { ObjectId } = require("mongodb");
+
 
 app.get("/allbooks/:id", async (req, res) => {
   try {
@@ -69,6 +71,83 @@ app.get("/allbooks/:id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching book by ID:", error);
     res.status(500).send({ message: "Failed to fetch book details" });
+  }
+});
+
+app.post("/conversations", async (req, res) => {
+  try {
+    const { senderEmail, receiverEmail } = req.body;
+
+    // Check if conversation already exists
+    const existing = await conversations.findOne({
+      members: { $all: [senderEmail, receiverEmail] },
+    });
+
+    if (existing) {
+      return res.status(200).send(existing);
+    }
+
+    // Create new conversation
+    const newConv = {
+      members: [senderEmail, receiverEmail],
+      createdAt: new Date(),
+    };
+
+    const result = await conversations.insertOne(newConv);
+    res.status(201).send(result);
+  } catch (error) {
+    console.error("Error creating conversation:", error);
+    res.status(500).send({ message: "Failed to create conversation" });
+  }
+});
+
+
+// Get all conversations for a user
+app.get("/conversations/:email", async (req, res) => {
+  try {
+    const userEmail = req.params.email;
+    const userConvs = await conversations
+      .find({ members: userEmail })
+      .toArray();
+    res.status(200).send(userConvs);
+  } catch (error) {
+    console.error("Error fetching conversations:", error);
+    res.status(500).send({ message: "Failed to fetch conversations" });
+  }
+});
+
+// Send a message
+app.post("/messages", async (req, res) => {
+  try {
+    const { conversationId, sender, text } = req.body;
+
+    const newMsg = {
+      conversationId,
+      sender,
+      text,
+      createdAt: new Date(),
+    };
+
+    const result = await messages.insertOne(newMsg);
+    res.status(201).send(result);
+  } catch (error) {
+    console.error("Error sending message:", error);
+    res.status(500).send({ message: "Failed to send message" });
+  }
+});
+
+// Get all messages of a conversation
+app.get("/messages/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const msgs = await messages
+      .find({ conversationId })
+      .sort({ createdAt: 1 })
+      .toArray();
+    res.status(200).send(msgs);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    res.status(500).send({ message: "Failed to fetch messages" });
   }
 });
 
