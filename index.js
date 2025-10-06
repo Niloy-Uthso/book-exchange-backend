@@ -31,7 +31,7 @@ async function run() {
     await client.connect();
 
     const database = client.db("bookExchange");  
-   const  allBooks = database.collection("allbooks");
+   const  allBooks = database.collection("allbooks")
 
    app.post("/allbooks", async (req, res) => {
   const book = req.body;
@@ -39,13 +39,47 @@ async function run() {
   res.send(result);
 });
 
+app.get("/allbooks", async (req,res)=>{
+try{
+  const email = req.query.email;
+   const query = email ? { owneremail: email } : {}; // filter if email provided
+    const books = await allBooks.find(query).toArray();
+
+    res.status(200).send(books);
+}
+catch (error) {
+    console.error("Error fetching books:", error);
+    res.status(500).send({ message: "Failed to fetch books" });
+  }
+
+})
+
+const { ObjectId } = require("mongodb");
+
+app.get("/allbooks/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const book = await allBooks.findOne({ _id: new ObjectId(id) });
+
+    if (!book) {
+      return res.status(404).send({ message: "Book not found" });
+    }
+
+    res.status(200).send(book);
+  } catch (error) {
+    console.error("Error fetching book by ID:", error);
+    res.status(500).send({ message: "Failed to fetch book details" });
+  }
+});
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
-    await client.close();
+    // await client.close();
   }
 }
 run().catch(console.dir);
