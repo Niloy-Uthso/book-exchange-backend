@@ -34,6 +34,26 @@ async function run() {
    const  allBooks = database.collection("allbooks")
 const conversations = database.collection("conversations");
 const messages = database.collection("messages");
+const users =database.collection("users")
+
+app.post("/users", async (req, res)=>{
+  const user = req.body;
+  const result = await users.insertOne(user)
+  res.send(result);
+})
+
+// GET /users/search?email=query
+app.get("/users/search", async (req, res) => {
+  const emailQuery = req.query.email;
+  if (!emailQuery) return res.json([]);
+
+  const user = await  users
+    .find({ email: { $regex: emailQuery, $options: "i" } })
+    .limit(10)
+    .toArray();
+
+  res.json(user);
+});
 
    app.post("/allbooks", async (req, res) => {
   const book = req.body;
@@ -74,82 +94,37 @@ app.get("/allbooks/:id", async (req, res) => {
   }
 });
 
-app.post("/conversations", async (req, res) => {
-  try {
-    const { senderEmail, receiverEmail } = req.body;
-
-    // Check if conversation already exists
-    const existing = await conversations.findOne({
-      members: { $all: [senderEmail, receiverEmail] },
+// Express route example
+ app.patch('/allbooks/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const updateData = req.body;
+        
+        // Use the allBooks collection that you defined
+        const result = await allBooks.updateOne(
+          { _id: new ObjectId(id) },
+          updateData // This should handle $push operator
+        );
+        
+        res.json(result);
+      } catch (error) {
+        console.error("Error updating book:", error);
+        res.status(500).json({ error: error.message });
+      }
     });
-
-    if (existing) {
-      return res.status(200).send(existing);
-    }
-
-    // Create new conversation
-    const newConv = {
-      members: [senderEmail, receiverEmail],
-      createdAt: new Date(),
-    };
-
-    const result = await conversations.insertOne(newConv);
-    res.status(201).send(result);
-  } catch (error) {
-    console.error("Error creating conversation:", error);
-    res.status(500).send({ message: "Failed to create conversation" });
-  }
-});
+ 
 
 
-// Get all conversations for a user
-app.get("/conversations/:email", async (req, res) => {
-  try {
-    const userEmail = req.params.email;
-    const userConvs = await conversations
-      .find({ members: userEmail })
-      .toArray();
-    res.status(200).send(userConvs);
-  } catch (error) {
-    console.error("Error fetching conversations:", error);
-    res.status(500).send({ message: "Failed to fetch conversations" });
-  }
-});
+
+ 
+
+// ✅ Create new conversation (if not already exists)
+ 
+  
+
 
 // Send a message
-app.post("/messages", async (req, res) => {
-  try {
-    const { conversationId, sender, text } = req.body;
-
-    const newMsg = {
-      conversationId,
-      sender,
-      text,
-      createdAt: new Date(),
-    };
-
-    const result = await messages.insertOne(newMsg);
-    res.status(201).send(result);
-  } catch (error) {
-    console.error("Error sending message:", error);
-    res.status(500).send({ message: "Failed to send message" });
-  }
-});
-
-// Get all messages of a conversation
-app.get("/messages/:conversationId", async (req, res) => {
-  try {
-    const { conversationId } = req.params;
-    const msgs = await messages
-      .find({ conversationId })
-      .sort({ createdAt: 1 })
-      .toArray();
-    res.status(200).send(msgs);
-  } catch (error) {
-    console.error("Error fetching messages:", error);
-    res.status(500).send({ message: "Failed to fetch messages" });
-  }
-});
+ 
 
 
 
