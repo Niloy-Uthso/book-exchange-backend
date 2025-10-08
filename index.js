@@ -112,6 +112,75 @@ app.get("/allbooks/:id", async (req, res) => {
         res.status(500).json({ error: error.message });
       }
     });
+
+     
+ app.get("/users/:email/borrowed-books", async (req, res) => {
+  console.log("jfidhfgihgshjdhfhdfghdifhgidhgfihdgfh")
+  try {
+    const email = req.params.email;
+    
+    const userDoc = await users.findOne({ email });
+
+    if (!userDoc || !userDoc.borrowedbookid || userDoc.borrowedbookid.length === 0) {
+      return res.send([]);
+    }
+
+    const ids = userDoc.borrowedbookid.map((id) => {
+      try {
+        return new ObjectId(id);
+      } catch {
+        return id;
+      }
+    });
+
+    const borrowedBooks = await allBooks
+      .find({ _id: { $in: ids } })
+      .toArray();
+
+    res.send(borrowedBooks);
+  } catch (err) {
+    console.error("Error fetching borrowed books:", err);
+    res.status(500).send({ message: "Server error" });
+  }
+});
+app.patch("/users/:email/return-book", async (req, res) => {
+  try {
+    const email = req.params.email;
+    const { bookId } = req.body;
+
+    if (!bookId) {
+      return res.status(400).send({ message: "Book ID is required" });
+    }
+
+    // 1️⃣ Remove from user's borrowedbookid array
+    await users.updateOne(
+      { email },
+      { $pull: { borrowedbookid: bookId } }
+    );
+
+    // 2️⃣ Update book status to "available" & clear currenthand
+    await allBooks.updateOne(
+      { _id: new ObjectId(bookId) },
+      {
+        $set: {
+          status: "available",
+          currenthand: null,
+        },
+      }
+    );
+
+    res.send({ success: true, message: "Book returned successfully" });
+  } catch (err) {
+    console.error("Error returning book:", err);
+    res.status(500).send({ message: "Server error" });
+  }
+});
+
+    
+
+    
+
+
  
 
 
