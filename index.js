@@ -96,22 +96,66 @@ app.get("/allbooks/:id", async (req, res) => {
 
 // Express route example
  app.patch('/allbooks/:id', async (req, res) => {
-      try {
-        const { id } = req.params;
-        const updateData = req.body;
-        
-        // Use the allBooks collection that you defined
-        const result = await allBooks.updateOne(
-          { _id: new ObjectId(id) },
-          updateData // This should handle $push operator
-        );
-        
-        res.json(result);
-      } catch (error) {
-        console.error("Error updating book:", error);
-        res.status(500).json({ error: error.message });
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Check if it's a $push operation to requestedby
+    if (updateData.$push && updateData.$push.requestedby) {
+      const newRequester = updateData.$push.requestedby;
+      
+      // Check if user already exists in requestedby array
+      const book = await allBooks.findOne({ 
+        _id: new ObjectId(id),
+        "requestedby.email": newRequester.email 
+      });
+      
+      if (book) {
+        return res.status(400).json({ 
+          error: "You have already requested this book" 
+        });
       }
+    }
+    
+    const result = await allBooks.updateOne(
+      { _id: new ObjectId(id) },
+      updateData
+    );
+    
+    res.json(result);
+  } catch (error) {
+    console.error("Error updating book:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+   
+    app.patch("/users/:requesterEmail/add-borrowed-book", async (req, res) => {
+  try {
+    const requesterEmail = req.params.requesterEmail;
+    const { bookId } = req.body;
+
+    if (!bookId) {
+      return res.status(400).send({ message: "Book ID is required" });
+    }
+
+    // 🔹 Add the borrowed book ID to the requester's borrowedbookid array (avoid duplicates)
+    const result = await users.updateOne(
+      { email: requesterEmail },
+      { $addToSet: { borrowedbookid: bookId } } // prevents duplicate book IDs
+    );
+
+    res.send({
+      success: true,
+      message: "Book added to requester's borrowed list successfully.",
+      result,
     });
+  } catch (error) {
+    console.error("Error adding borrowed book:", error);
+    res.status(500).send({ message: "Server error while adding borrowed book" });
+  }
+});
+
 
      
  app.get("/users/:email/borrowed-books", async (req, res) => {
@@ -143,24 +187,41 @@ app.get("/allbooks/:id", async (req, res) => {
     res.status(500).send({ message: "Server error" });
   }
 });
+
+
 app.patch("/users/:email/return-book", async (req, res) => {
   try {
     const email = req.params.email;
     const { bookId } = req.body;
 
+    console.log("Returning book - Email:", email, "Book ID:", bookId);
+
     if (!bookId) {
       return res.status(400).send({ message: "Book ID is required" });
     }
 
-    // 1️⃣ Remove from user's borrowedbookid array
-    await users.updateOne(
+    // 1️⃣ Remove from user's borrowedbookid array (using string comparison)
+    const userUpdate = await users.updateOne(
       { email },
-      { $pull: { borrowedbookid: bookId } }
+      { $pull: { borrowedbookid: bookId } } // Use bookId as string, not ObjectId
     );
 
+    console.log("User update result:", userUpdate);
+
+    // Check if user was found and updated
+    if (userUpdate.matchedCount === 0) {
+      return res.status(404).send({ message: "User not found" });
+    }
+
+    if (userUpdate.modifiedCount === 0) {
+      console.log("Book was not found in user's borrowed array");
+      // Continue anyway to update book status
+    }
+
     // 2️⃣ Update book status to "available" & clear currenthand
-    await allBooks.updateOne(
-      { _id: new ObjectId(bookId) },
+    // For the book document, _id is likely still ObjectId in the database
+    const bookUpdate = await allBooks.updateOne(
+      { _id: new ObjectId(bookId) }, // Use ObjectId here for the book collection
       {
         $set: {
           status: "available",
@@ -169,10 +230,24 @@ app.patch("/users/:email/return-book", async (req, res) => {
       }
     );
 
-    res.send({ success: true, message: "Book returned successfully" });
-  } catch (err) {
-    console.error("Error returning book:", err);
-    res.status(500).send({ message: "Server error" });
+    console.log("Book update result:", bookUpdate);
+
+    if (bookUpdate.matchedCount === 0) {
+      return res.status(404).send({ message: "Book not found" });
+    }
+
+    res.status(200).send({ 
+      message: "Book returned successfully",
+      userUpdate,
+      bookUpdate 
+    });
+
+  } catch (error) {
+    console.error("Return book error:", error);
+    res.status(500).send({ 
+      message: "Internal server error",
+      error: error.message 
+    });
   }
 });
 
