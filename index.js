@@ -36,11 +36,19 @@ const conversations = database.collection("conversations");
 const messages = database.collection("messages");
 const users =database.collection("users")
 
-app.post("/users", async (req, res)=>{
+app.post("/users", async (req, res) => {
   const user = req.body;
-  const result = await users.insertOne(user)
+  const existingUser = await users.findOne({ email: user.email });
+
+  if (existingUser) {
+    console.log("what");
+    return res.send({ message: "User already exists", insertedId: null });
+  }
+
+  const result = await users.insertOne(user);
   res.send(result);
-})
+});
+
 
 // GET /users/search?email=query
 app.get("/users/search", async (req, res) => {
@@ -93,6 +101,77 @@ app.get("/allbooks/:id", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch book details" });
   }
 });
+
+app.delete("/allbooks/:id", async(req,res)=>{
+
+  try {
+    const id = req.params.id;
+    const userEmail = req.query.email;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email required" });
+    }
+
+    const book = await allBooks.findOne({_id: new ObjectId(id)});
+    if(!book){
+      return res.status(404).json({message: "Book not found"});
+
+      
+    }
+    if (book.owneremail !== userEmail) {
+      return res.status(403).json({ message: "Unauthorized: Not your book" });
+    }
+
+    const result = await allBooks.deleteOne({_id: new ObjectId(id)});
+     res.json({ message: "✅ Book deleted successfully", result });
+  } catch (error) {
+    console.error("Error deleting book:", error);
+    res.status(500).json({ error: error.message });
+   
+  }
+})
+
+// Update a book by ID — only the owner can edit
+app.patch("/allbooks-edit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const requesterEmail = req.query.email; // owner email passed from frontend
+
+    if (!requesterEmail) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // Find the book
+    const book = await allBooks.findOne({ _id: new ObjectId(id) });
+    if (!book) {
+      return res.status(404).json({ success: false, message: "Book not found" });
+    }
+
+    // Ownership check
+    if (book.owneremail !== requesterEmail) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Unauthorized: You can only edit your own books" });
+    }
+
+    // Perform update
+    const result = await allBooks.updateOne(
+      { _id: new ObjectId(id) },
+      updateData // e.g. { $set: { name, writer, ... } }
+    );
+
+    res.json({
+      success: true,
+      message: "Book updated successfully",
+      result,
+    });
+  } catch (error) {
+    console.error("Error updating book:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 // Express route example
  app.patch('/allbooks/:id', async (req, res) => {
@@ -159,7 +238,7 @@ app.get("/allbooks/:id", async (req, res) => {
 
      
  app.get("/users/:email/borrowed-books", async (req, res) => {
-  console.log("jfidhfgihgshjdhfhdfghdifhgidhgfihdgfh")
+   
   try {
     const email = req.params.email;
     
