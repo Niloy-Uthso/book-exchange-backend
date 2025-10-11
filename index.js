@@ -3,7 +3,7 @@ dotenv.config();
 const express = require("express");
 const cors = require("cors");
 
-// const admin = require("firebase-admin");
+ 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
@@ -16,8 +16,7 @@ app.use(express.json());
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.t3hmlwb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-
+ 
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -27,13 +26,12 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+     
+    // await client.connect();
 
     const database = client.db("bookExchange");  
    const  allBooks = database.collection("allbooks")
-const conversations = database.collection("conversations");
-const messages = database.collection("messages");
+ 
 const users =database.collection("users")
 
 app.post("/users", async (req, res) => {
@@ -50,7 +48,7 @@ app.post("/users", async (req, res) => {
 });
 
 
-// GET /users/search?email=query
+ 
 app.get("/users/search", async (req, res) => {
   const emailQuery = req.query.email;
   if (!emailQuery) return res.json([]);
@@ -72,7 +70,7 @@ app.get("/users/search", async (req, res) => {
 app.get("/allbooks", async (req,res)=>{
 try{
   const email = req.query.email;
-   const query = email ? { owneremail: email } : {}; // filter if email provided
+   const query = email ? { owneremail: email } : {}; 
     const books = await allBooks.find(query).toArray();
 
     res.status(200).send(books);
@@ -131,34 +129,34 @@ app.delete("/allbooks/:id", async(req,res)=>{
   }
 })
 
-// Update a book by ID — only the owner can edit
+ 
 app.patch("/allbooks-edit/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
-    const requesterEmail = req.query.email; // owner email passed from frontend
+    const requesterEmail = req.query.email; 
 
     if (!requesterEmail) {
       return res.status(400).json({ success: false, message: "Email is required" });
     }
 
-    // Find the book
+     
     const book = await allBooks.findOne({ _id: new ObjectId(id) });
     if (!book) {
       return res.status(404).json({ success: false, message: "Book not found" });
     }
 
-    // Ownership check
+    
     if (book.owneremail !== requesterEmail) {
       return res
         .status(403)
         .json({ success: false, message: "Unauthorized: You can only edit your own books" });
     }
 
-    // Perform update
+     
     const result = await allBooks.updateOne(
       { _id: new ObjectId(id) },
-      updateData // e.g. { $set: { name, writer, ... } }
+      updateData  
     );
 
     res.json({
@@ -173,17 +171,17 @@ app.patch("/allbooks-edit/:id", async (req, res) => {
 });
 
 
-// Express route example
+ 
  app.patch('/allbooks/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
     
-    // Check if it's a $push operation to requestedby
+     
     if (updateData.$push && updateData.$push.requestedby) {
       const newRequester = updateData.$push.requestedby;
       
-      // Check if user already exists in requestedby array
+     
       const book = await allBooks.findOne({ 
         _id: new ObjectId(id),
         "requestedby.email": newRequester.email 
@@ -218,10 +216,10 @@ app.patch("/allbooks-edit/:id", async (req, res) => {
       return res.status(400).send({ message: "Book ID is required" });
     }
 
-    // 🔹 Add the borrowed book ID to the requester's borrowedbookid array (avoid duplicates)
+ 
     const result = await users.updateOne(
       { email: requesterEmail },
-      { $addToSet: { borrowedbookid: bookId } } // prevents duplicate book IDs
+      { $addToSet: { borrowedbookid: bookId } } 
     );
 
     res.send({
@@ -279,28 +277,27 @@ app.patch("/users/:email/return-book", async (req, res) => {
       return res.status(400).send({ message: "Book ID is required" });
     }
 
-    // 1️⃣ Remove from user's borrowedbookid array (using string comparison)
+    
     const userUpdate = await users.updateOne(
       { email },
-      { $pull: { borrowedbookid: bookId } } // Use bookId as string, not ObjectId
+      { $pull: { borrowedbookid: bookId } } 
     );
 
     console.log("User update result:", userUpdate);
 
-    // Check if user was found and updated
+    
     if (userUpdate.matchedCount === 0) {
       return res.status(404).send({ message: "User not found" });
     }
 
     if (userUpdate.modifiedCount === 0) {
       console.log("Book was not found in user's borrowed array");
-      // Continue anyway to update book status
+      
     }
 
-    // 2️⃣ Update book status to "available" & clear currenthand
-    // For the book document, _id is likely still ObjectId in the database
+    
     const bookUpdate = await allBooks.updateOne(
-      { _id: new ObjectId(bookId) }, // Use ObjectId here for the book collection
+      { _id: new ObjectId(bookId) }, 
       {
         $set: {
           status: "available",
@@ -352,8 +349,8 @@ app.patch("/users/:email/return-book", async (req, res) => {
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
