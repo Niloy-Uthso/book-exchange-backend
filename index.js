@@ -47,7 +47,11 @@ app.post("/users", async (req, res) => {
   res.send(result);
 });
 
-
+app.get("/users/:email", async (req, res) => {
+  const email = req.params.email;
+  const user = await users.findOne({ email });
+  res.send(user);
+});
  
 app.get("/users/search", async (req, res) => {
   const emailQuery = req.query.email;
@@ -81,6 +85,21 @@ catch (error) {
   }
 
 })
+
+app.get("/allbooks-state", async (req, res) => {
+  try {
+    const books = await allBooks.find().toArray();
+
+    if (!books || books.length === 0) {
+      return res.status(404).json({ message: "No books found" });
+    }
+
+    res.status(200).json(books);
+  } catch (error) {
+    console.error("❌ Error fetching all books:", error);
+    res.status(500).json({ message: "Failed to fetch books" });
+  }
+});
 
 
 
@@ -338,12 +357,12 @@ app.patch("/users/:email/return-book", async (req, res) => {
 
  
 
-// ✅ Create new conversation (if not already exists)
+ 
  
   
 
 
-// Send a message
+ 
  
 
 
